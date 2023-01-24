@@ -31,14 +31,20 @@ class Word:
         return f"Word: {self.word}, Score: {self.score}, X: {self.x}, Y: {self.y}, Direction: {'Right' if self.right else 'Down'}"
 
 class Board:
-    def __init__(self, board):
-        self.board = board
-        self.width = len(board[0])
-        self.height = len(board)
+    def __init__(self, board=None):
+        self.width = 15
+        self.height = 15
         self.letters = set()
-        for row in board:
-            for letter in row:
-                self.letters.add(letter)
+
+        if board is None:
+            self.board = []
+            for _ in range(self.height):
+                row = []
+                for _ in range(self.width):
+                    row.append(' ')
+                self.board.append(row)
+        else:
+            self.board = board
 
         # letter and word multipliers are represented by a dictionary of coordinates and the multiplier
         self.letter_multipliers = {(0, 3): 2, (0, 11): 3, (1, 5): 3, (1, 9): 3, (2, 6): 2, (2, 8): 2, (3, 0): 2, (3, 7): 2, (3, 14): 2, (5, 1): 3, (5, 5): 3, (5, 9): 3, (5, 13): 3, (6, 2): 2, (6, 6): 2, (6, 8): 2, (6, 12): 2, (7, 3): 2, (7, 11): 2, (8, 2): 2,
@@ -75,37 +81,42 @@ class Board:
         return neighbors
 
     # helper function to calculate the score of a word based on letter scores and multipliers on the board
-    def calculate_score(self, word):
+    def calculate_score(self, word, x=None, y=None, right=True):
         score = 0
-        gotten_multipliers = []
-        # loop through all the letters of the word
+        word_multiplier = 0
         for i in range(len(word)):
-            # add the score of the letter
-            score += scores[word[i]]
-            # check for multipliers on the board
-            for j in range(self.height):
-                for k in range(self.width):
-                    if self.get_letter(j, k) == word[i]:
-                        # check for letter multipliers
-                        if (j, k) in self.letter_multipliers:
-                            score *= self.letter_multipliers[(j, k)]
-                        # check for word multipliers
-                        if (j, k) in self.word_multipliers:
-                            gotten_multipliers.append(self.word_multipliers[(j, k)])
-        multiplier = sum(gotten_multipliers)
-        return score * multiplier
+            if x is not None and y is not None:
+                if (x, y) in self.letter_multipliers and self.get_letter(x, y) == ' ':
+                    score += scores[word[i]] * self.letter_multipliers[(x, y)]
+                else:
+                    score += scores[word[i]]
+                    if (x, y) in self.word_multipliers and self.get_letter(x, y) == ' ':
+                        word_multiplier += self.word_multipliers[(x, y)]
+                if right:
+                    x += 1
+                else:
+                    y += 1
+            else:
+                score += scores[word[i]]
+        if word_multiplier > 0:
+            score *= word_multiplier
+        return score
     
     def generate_possible_words(self, in_hand, words):
+        # if board is empty, return all the words that can be formed by the letters in hand
+        if self.is_empty():
+            return self.generate_hand_words(in_hand, words)
+
         possible_words = []
         # check all the words that can be formed by the letters on the board and in hand
         for x in range(self.width):
             for y in range(self.height):
                 if self.get_letter(x, y) != ' ':
                     for word in words:
-                        if self.get_letter(x, y) in word:
+                        if self.check_word_validity(word, in_hand) and self.get_letter(x, y) in word:
                             if all(letter in in_hand for letter in word.replace(self.get_letter(x, y), '')):
                                 for i in range(len(word)):
-                                    if self.get_letter(x, y) == word[i] and self.check_word_validity(word, in_hand):
+                                    if self.get_letter(x, y) == word[i]:
                                         if self.check_right(x, y, i, word):
                                             score = self.calculate_score(word)
                                             # figure out the real coordinates of the word, x and y should be the first letter of the word
@@ -231,26 +242,53 @@ class Board:
             else:
                 return False
         return True
+    
+    def is_empty(self):
+        # check if the board is empty
+        for i in range(self.height):
+            for j in range(self.width):
+                if self.get_letter(i, j) != ' ':
+                    return False
+        return True
 
     # used on the first turn to generate all the words that can be formed by the letters in hand
     def generate_hand_words(self, in_hand, words):
         possible_words = []
         # check all the words that can be formed by the letters in hand
         for word in words:
-            if all(letter in in_hand for letter in word):
-                score = self.calculate_score(word)
-                possible_words.append(Word(word, score, None, None, None))
+            if self.check_word_validity(word, in_hand) and all(letter in in_hand for letter in word):
+                # if word is longer than 5 letters, place it 4 squares to the left of the center
+                # so we can get the 2x letter multiplier
+                y = self.height // 2
+                x = self.width // 2
+                if len(word) >= 5:
+                    x -= 4
+                score = self.calculate_score(word, x, y, True)
+                possible_words.append(Word(word, score, x, y, True))
         return possible_words
 
+    def get_best_word(self, in_hand, words):
+        possible_words = self.generate_hand_words(in_hand, words)
+        best_word = possible_words[0]
+        for word in possible_words:
+            if word.score > best_word.score:
+                best_word = word
+        return best_word
 
-board = Board(gen_random_board(0.9))
+
+# board = Board(gen_random_board(0.9))
+board = Board()
 print(board)
+
+# best word
+best_word = board.get_best_word(in_hand, words)
+print("BEST WORD:", best_word)
 print("ALL WORDS: ")
 words = board.generate_possible_words(in_hand, words)
-# first 10 down
+
+# first 10
 counter = 0
 for word in words:
-    if not word.right:
-        print(word)
-        counter += 1
-        if counter == 10: break
+    print(word)
+    counter += 1
+    if counter == 10: break
