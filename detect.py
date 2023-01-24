@@ -1,7 +1,8 @@
 from main import Board
 import cv2
-import string
+import tensorflow as tf
 import numpy as np
+
 # import pytesseract
 # import getpass
 
@@ -12,14 +13,14 @@ import numpy as np
 def preprocess_tile(image_path):
     image = cv2.imread(image_path)
     image = cv2.resize(image, (17, 18))
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(gray, 50, 150)
-    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # edges = cv2.Canny(gray, 50, 150)
+    # contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     # crop the image to the largest contour
-    valid_contours = [c for c in contours if cv2.arcLength(c, True) > 50]
-    tile_contour = max(valid_contours, key=cv2.contourArea)
-    x,y,w,h = cv2.boundingRect(tile_contour)
-    tile = gray[y:y+h, x:x+w]
+    # valid_contours = [c for c in contours if cv2.arcLength(c, True) > 50]
+    # tile_contour = max(valid_contours, key=cv2.contourArea)
+    # x,y,w,h = cv2.boundingRect(tile_contour)
+    # tile = gray[y:y+h, x:x+w]
     return image
 
 def find_board_edges(image):
@@ -97,6 +98,8 @@ def find_tile_in_board(tile, board):
 if __name__ == '__main__':
     image = cv2.imread('examples/wide_board.png')
 
+    # Load model
+    model = tf.keras.models.load_model('tile_classifier.h5')
     # preprocess tiles
     # for image in os.listdir('tiles'):
     #     tile = preprocess_tile(os.path.join('tiles', image))
@@ -118,13 +121,29 @@ if __name__ == '__main__':
     #     #     print("Found letter", letter, "at", idx)
 
     import os
-    for image in os.listdir('tiles'):
-        tile = cv2.imread(os.path.join('tiles', image))
-        loc = find_tile_in_board(tile, board)
-        if loc:
-            # save image at location of tile
-            tile = board[loc[0][1]:loc[0][1]+tile.shape[0], loc[0][0]:loc[0][0]+tile.shape[1]]
-            cv2.imwrite("tile.png", tile)
-            print("Found tile", image, "at", loc)
-            
+    for image in os.listdir('tiles/a'):
+        tile = cv2.imread(os.path.join('tiles/a', image))
+        # save image at location of tile
+        # tile = board[loc[0][1]:loc[0][1]+tile.shape[0], loc[0][0]:loc[0][0]+tile.shape[1]]
+
+        # save the tile
+        cv2.imwrite("tile.png", tile)
         
+        # load the tile
+        image = cv2.imread("tile.png", cv2.IMREAD_GRAYSCALE)
+        # image needs to be shape=(None, 17, 18, 1)
+        image = image.reshape((1, 17, 18, 1))
+        # save the tile
+        # cv2.imwrite("tile.png", image.reshape((17, 18)))
+
+        # predict tile
+        # image = cv2.resize(tile, (17, 18))
+        # image = tile.reshape((17, 18, 1))
+        prediction = model.predict(image)
+        predicted_label = tf.argmax(prediction)
+        # # convert hot one encoding to label
+        # letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        # predicted_label = letters[predicted_label]
+
+        print("Predicted label:", predicted_label)
+    
