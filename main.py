@@ -142,7 +142,7 @@ class Board:
                     # check out of bounds
                     if word.x + len(word.word) >= self.width:
                         possible_words.remove(word)
-                        break
+                        continue
                     for i in range(len(word.word)):
                         if self.get_letter(word.x + i, word.y) != " " and self.get_letter(word.x + i, word.y) != word.word[i]:
                             # square is already occupied, remove the word from the list
@@ -154,34 +154,34 @@ class Board:
                         neighbors = self.get_neighbors(word.x + i, word.y)
                         for neighbor in neighbors:
                             if self.get_letter(neighbor[0], neighbor[1]) != ' ':
-                                # TODO: add logic to check validity of connecting words
-                                if neighbor[1] == word.y and neighbor[0] >= word.x + i:
-                                    if word.word[neighbor[0] - word.x] != self.get_letter(neighbor[0], neighbor[1]):
-                                        # square is already occupied, remove the word from the list
-                                        possible_words.remove(word)
-                                        break_out = True
-                                        break
-                                    else:
-                                        # square is occupied by the same letter, no need to check neighbors
-                                        continue
-
-                                # # check that the word is valid
-                                # word = self.get_letter(neighbor[0], neighbor[1]) + self.get_letter(word.x + i, word.y)
-                                # if word in words:
-                                #     score = self.calculate_score(word)
-                                #     possible_words.append(Word(word, score, neighbor[0], neighbor[1], True))
+                                # get the starting coordinates of the connected word
+                                y = neighbor[1]
+                                org_y = neighbor[1]
+                                while self.get_letter(neighbor[0], y) != ' ' and y > 0:
+                                    y -= 1
                                 
-                                # for now, remove the word from the list
-                                possible_words.remove(word)
-                                break_out = True
-                                break
+                                # get the word
+                                connected_word = ""
+                                b_y = y
+                                while self.get_letter(neighbor[0], b_y) != ' ' and b_y < org_y:
+                                    connected_word += self.get_letter(neighbor[0], b_y)
+                                    b_y += 1
+
+                                # check if the connected word is valid
+                                if connected_word not in words:
+                                    possible_words.remove(word)
+                                    break_out = True
+                                    break
+                                else:
+                                    # add the score of the connected word to the score of the original word
+                                    word.score += self.calculate_score(connected_word, neighbor[0], y, False)
 
                         if break_out: break
                 else:
                     # check out of bounds
                     if word.y + len(word.word) >= self.height:
                         possible_words.remove(word)
-                        break
+                        continue
 
                     for i in range(len(word.word)):
                         if self.get_letter(word.x, word.y + i) != " " and self.get_letter(word.x, word.y + i) != word.word[i]:
@@ -195,21 +195,27 @@ class Board:
                         neighbors = self.get_neighbors(word.x, word.y + i)
                         for neighbor in neighbors:
                             if self.get_letter(neighbor[0], neighbor[1]) != ' ':
-                                # TODO: add logic to check validity of connecting words
-                                if neighbor[0] == word.x and neighbor[1] >= word.y + i:
-                                    if word.word[neighbor[1] - word.y] != self.get_letter(neighbor[0], neighbor[1]):
-                                        # square is already occupied, remove the word from the list
-                                        possible_words.remove(word)
-                                        break_out = True
-                                        break
-                                    else:
-                                        # square is occupied by the same letter, no need to check neighbors
-                                        continue
+                                # get the starting coordinates of the connected word
+                                x = neighbor[0]
+                                org_x = neighbor[0]
+                                while self.get_letter(x, neighbor[1]) != ' ' and x > 0:
+                                    x -= 1
                                 
-                                # for now, remove the word from the list
-                                possible_words.remove(word)
-                                break_out = True
-                                break
+                                # get the word
+                                connected_word = ""
+                                b_x = x
+                                while self.get_letter(b_x, neighbor[1]) != ' ' and b_x < org_x:
+                                    connected_word += self.get_letter(b_x, neighbor[1])
+                                    b_x += 1
+                                
+                                # check if the connected word is valid
+                                if connected_word not in words:
+                                    possible_words.remove(word)
+                                    break_out = True
+                                    break
+                                else:
+                                    # add the score of the connected word to the score of the original word
+                                    word.score += self.calculate_score(connected_word, x, neighbor[1], True)
                         
                         if break_out: break
             except:
@@ -268,7 +274,7 @@ class Board:
         return possible_words
 
     def get_best_word(self, in_hand, words):
-        possible_words = self.generate_hand_words(in_hand, words)
+        possible_words = self.generate_possible_words(in_hand, words)
         best_word = possible_words[0]
         for word in possible_words:
             if word.score > best_word.score:
@@ -276,8 +282,8 @@ class Board:
         return best_word
 
 
-# board = Board(gen_random_board(0.9))
-board = Board()
+board = Board(gen_random_board(0.9))
+# board = Board()
 print(board)
 
 # best word
