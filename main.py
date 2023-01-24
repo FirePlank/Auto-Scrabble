@@ -281,20 +281,20 @@ class Board:
                 best_word = word
         return best_word
 
+if __name__ == "__main__":
+    board = Board(gen_random_board(0.9))
+    # board = Board()
+    print(board)
 
-board = Board(gen_random_board(0.9))
-# board = Board()
-print(board)
+    # best word
+    best_word = board.get_best_word(in_hand, words)
+    print("BEST WORD:", best_word)
+    print("ALL WORDS: ")
+    words = board.generate_possible_words(in_hand, words)
 
-# best word
-best_word = board.get_best_word(in_hand, words)
-print("BEST WORD:", best_word)
-print("ALL WORDS: ")
-words = board.generate_possible_words(in_hand, words)
-
-# first 10
-counter = 0
-for word in words:
-    print(word)
-    counter += 1
-    if counter == 10: break
+    # first 10
+    counter = 0
+    for word in words:
+        print(word)
+        counter += 1
+        if counter == 10: break
