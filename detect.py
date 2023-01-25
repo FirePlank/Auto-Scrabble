@@ -1,6 +1,4 @@
-from main import Board
 import cv2
-import tensorflow as tf
 import numpy as np
 
 # import pytesseract
@@ -32,11 +30,13 @@ def find_board_edges(image):
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     # find the largest contour
-    valid_contours = [c for c in contours if cv2.arcLength(c, True) > 50]
+    valid_contours = [c for c in contours if cv2.arcLength(c, True) > 200]
+    # if none found, return None
+    if len(valid_contours) == 0: return None
     board_contour = max(valid_contours, key=cv2.contourArea)
     # find the bounding rectangle
     x,y,w,h = cv2.boundingRect(board_contour)
-    # print("x,y,w,h:",x,y,w,h)
+    org = (x*2,y*2)
 
     # return ROI (region of interest)
     board = image[y:y+h, x:x+w]
@@ -74,14 +74,30 @@ def find_board_edges(image):
             x,y,w,h = cv2.boundingRect(approx)
             if w > 10 and h > 10:
                 squares.append(approx)
-            
-    # save the first square as image
-    x,y,w,h = cv2.boundingRect(squares[94])
+
+    if len(squares) == 0: return None
+    first = squares[0]
+    last = squares[-1]
+
+    # find the bounding rectangle of the first and last squares
+    x1,y1,w1,h1 = cv2.boundingRect(first)
+    x2,y2,w2,h2 = cv2.boundingRect(last)
+
+    # find the top-left and bottom-right coordinates of the cropped board
+    x_start = min(x1,x2)
+    y_start = min(y1,y2)
+    x_end = max(x1+w1,x2+w2)
+    y_end = max(y1+h1,y2+h2)
+
+    # crop the board
+    board = board[y_start:y_end, x_start:x_end]
 
     # save the board
     cv2.imwrite("board.png", board)
 
-    return squares
+    board_x, board_y, board_w, board_h = cv2.boundingRect(board_contour)
+    square_size = board_w // 15
+    return (square_size, org[0]+x_start, org[1]+y_start)
 
 def find_tile_in_board(tile, board):
     result = cv2.matchTemplate(board, tile, cv2.TM_CCOEFF_NORMED)
@@ -135,10 +151,18 @@ def predict_board(image, model):
             # letter = letter_to_int.keys()[letter_to_int.values().index(np.argmax(prediction))]
             # board[i//18][j//17] = letter
 
-
+def move_mouse_to_square(x, y, square_size, x_offset, y_offset):
+    # calculate the x and y coordinates of the square on the screen, accounting for the 2px gap
+    # slowly increase offset as x and y increase. linearly increase offset over time as it gets closer to 15
+    ox = 23 * x / 15
+    oy = 23 * y / 15
+    square_x = x * (square_size + ox)
+    square_y = y * (square_size + oy)
+    # move the mouse to the square
+    pyautogui.moveTo(square_x + x_offset, square_y + y_offset)
 
 if __name__ == '__main__':
-    image = cv2.imread('examples/wide_board.png')
+    # image = cv2.imread('examples/wide_board.png')
 
     # Load model
     # model = tf.keras.models.load_model('tile_classifier.h5')
@@ -148,9 +172,22 @@ if __name__ == '__main__':
     #     cv2.imwrite(os.path.join('tiles', image), tile)
 
     # see if we can find the tiles in the board
-    tiles = find_board_edges(image)
-    board = cv2.imread("board.png")
-    predict_board("board.png", None)
+    import pyautogui
+    # tiles = find_board_edges(image)
+    # take full monitor screenshot
+    screenshot = pyautogui.screenshot()
+    screenshot = np.array(screenshot)
+    # save the screenshot
+    cv2.imwrite("screenshot.png", screenshot)
+    # get the board coordinates
+    board_coords = find_board_edges(screenshot)
+    print(board_coords)
+    if board_coords is None:
+        print("Board not found!")
+        exit(1)
+    move_mouse_to_square(7, 1, board_coords[0], board_coords[1]+10, board_coords[2]+10)
+    # board = cv2.imread("board.png")
+    # predict_board("board.png", None)
     # for idx, tile in enumerate(tiles):
     #     x,y,w,h = cv2.boundingRect(tile)
     #     # get the tile from the board based on the x,y,w,h

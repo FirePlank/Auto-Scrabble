@@ -1,4 +1,3 @@
 mitmproxy
 opencv-python
 numpy
-tensorflow
