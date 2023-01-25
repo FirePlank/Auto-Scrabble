@@ -94,12 +94,54 @@ def find_tile_in_board(tile, board):
     if len(found) > 0:
         return found
         
+import numpy as np
+
+def predict_board(image, model):
+    # Load the image of the board
+    board_image = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
+
+    # Resize the image to match the size of the board
+    board_image = cv2.resize(board_image, (255, 270))
+
+    # Define the size of the window (same as the tile size)
+    window_size = (17, 18)
+    # Define the step size of the window (2 pixels in x and y)
+    step_size = (2, 2)
+
+    # Initialize the 2D array to store the board
+    board = np.empty((15, 15), dtype=str)
+
+    # define letter to int mapping
+    letter_to_int = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7, 'i': 8, 'j': 9, 'k': 10, 'l': 11, 'm': 12, 'n': 13, 'o': 14, 'p': 15, 'q': 16, 'r': 17, 's': 18, 't': 19, 'u': 20, 'v': 21, 'w': 22, 'x': 23, 'y': 24, 'z': 25}
+
+    # Slide the window across the board and classify each tile
+    for i in range(0, 15*18, step_size[1]):
+        for j in range(0, 15*17, step_size[0]):
+            x1 = j
+            y1 = i
+            x2 = x1 + window_size[0]
+            y2 = y1 + window_size[1]
+            tile_image = board_image[y1:y2, x1:x2]
+            tile_image = cv2.resize(tile_image, (17, 18))
+            tile_image = np.expand_dims(tile_image, axis=-1)
+            tile_image = np.expand_dims(tile_image, axis=0)
+            #resize the image before saving
+            tile_image = cv2.resize(tile_image, window_size)
+            # save the tile
+            cv2.imwrite("tile.png", tile_image)
+            # wait for key press
+            cv2.waitKey(0)
+            # prediction = model.predict(tile_image)
+            # letter = letter_to_int.keys()[letter_to_int.values().index(np.argmax(prediction))]
+            # board[i//18][j//17] = letter
+
+
 
 if __name__ == '__main__':
     image = cv2.imread('examples/wide_board.png')
 
     # Load model
-    model = tf.keras.models.load_model('tile_classifier.h5')
+    # model = tf.keras.models.load_model('tile_classifier.h5')
     # preprocess tiles
     # for image in os.listdir('tiles'):
     #     tile = preprocess_tile(os.path.join('tiles', image))
@@ -108,6 +150,7 @@ if __name__ == '__main__':
     # see if we can find the tiles in the board
     tiles = find_board_edges(image)
     board = cv2.imread("board.png")
+    predict_board("board.png", None)
     # for idx, tile in enumerate(tiles):
     #     x,y,w,h = cv2.boundingRect(tile)
     #     # get the tile from the board based on the x,y,w,h
@@ -120,30 +163,29 @@ if __name__ == '__main__':
     #     # if letter != '':
     #     #     print("Found letter", letter, "at", idx)
 
-    import os
-    for image in os.listdir('tiles/a'):
-        tile = cv2.imread(os.path.join('tiles/a', image))
-        # save image at location of tile
-        # tile = board[loc[0][1]:loc[0][1]+tile.shape[0], loc[0][0]:loc[0][0]+tile.shape[1]]
+    # import os
+    # for image in os.listdir('tiles/a'):
+    #     tile = cv2.imread(os.path.join('tiles/a', image))
+    #     # save image at location of tile
+    #     # tile = board[loc[0][1]:loc[0][1]+tile.shape[0], loc[0][0]:loc[0][0]+tile.shape[1]]
 
-        # save the tile
-        cv2.imwrite("tile.png", tile)
+    #     # save the tile
+    #     cv2.imwrite("tile.png", tile)
         
-        # load the tile
-        image = cv2.imread("tile.png", cv2.IMREAD_GRAYSCALE)
-        # image needs to be shape=(None, 17, 18, 1)
-        image = image.reshape((1, 17, 18, 1))
-        # save the tile
-        # cv2.imwrite("tile.png", image.reshape((17, 18)))
+    #     # load the tile
+    #     image = cv2.imread("tile.png", cv2.IMREAD_GRAYSCALE)
+    #     # image needs to be shape=(None, 17, 18, 1)
+    #     image = image.reshape((1, 17, 18, 1))
+    #     # save the tile
+    #     # cv2.imwrite("tile.png", image.reshape((17, 18)))
 
-        # predict tile
-        # image = cv2.resize(tile, (17, 18))
-        # image = tile.reshape((17, 18, 1))
-        prediction = model.predict(image)
-        predicted_label = tf.argmax(prediction)
-        # # convert hot one encoding to label
-        # letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-        # predicted_label = letters[predicted_label]
+    #     # predict tile
+    #     # image = cv2.resize(tile, (17, 18))
+    #     # image = tile.reshape((17, 18, 1))
+    #     prediction = model.predict(image)
+    #     predicted_label = tf.argmax(prediction)
+    #     # # convert hot one encoding to label
+    #     # letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    #     # predicted_label = letters[predicted_label]
 
-        print("Predicted label:", predicted_label)
-    
+    #     print("Predicted label:", predicted_label)
