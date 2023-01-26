@@ -200,6 +200,10 @@ class Board:
             raise IllegalMoveError("Cannot place this word on the given coordinates")
         self.empty = False
 
+    def get_letter(self, x, y):
+        """gets the letter on the given coordinate"""
+        return self.square(x, y).tile
+
     def generate_moves(self, anchor, direction, rack, dictionary, tile_set, anchors_used):
         """generate all possible moves from a given anchor with the current rack"""
 

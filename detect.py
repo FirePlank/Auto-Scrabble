@@ -24,8 +24,13 @@ def preprocess_tile(image_path):
 def find_board_edges(image):
     # normalize and resize image
     image = cv2.resize(image, (0,0), fx=0.5, fy=0.5)
+    # convert to grayscale
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # find edges
     edges = cv2.Canny(image, 50, 150)
+
+    # save edges
+    cv2.imwrite('edgesa.png', edges)
     # find contours
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -33,6 +38,7 @@ def find_board_edges(image):
     valid_contours = [c for c in contours if cv2.arcLength(c, True) > 200]
     # if none found, return None
     if len(valid_contours) == 0: return None
+    valid_contours = [c for c in valid_contours if cv2.boundingRect(c)[2] > 200 and cv2.boundingRect(c)[3] > 200]
     board_contour = max(valid_contours, key=cv2.contourArea)
     # find the bounding rectangle
     x,y,w,h = cv2.boundingRect(board_contour)
@@ -49,19 +55,11 @@ def find_board_edges(image):
     # blue_edges = cv2.bitwise_not(blue_edges)
     # blue_edges = cv2.bitwise_and(blue_edges, mask)
 
-    # remove blue edges
-    second = cv2.Canny(board, 50, 150)
-
-    # second = cv2.bitwise_and(second, cv2.bitwise_not(mask))
-
-    # convert board to grayscale
-    board = cv2.cvtColor(board, cv2.COLOR_BGR2GRAY)
-
     # save edges
-    cv2.imwrite("edges.png", second)
+    cv2.imwrite("edges.png", edges)
 
     # find contours
-    contours, _ = cv2.findContours(second, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     # find all the squares in the board
     squares = []
     for c in contours:
@@ -153,11 +151,16 @@ def predict_board(image, model):
 
 def move_mouse_to_square(x, y, square_size, x_offset, y_offset):
     # calculate the x and y coordinates of the square on the screen, accounting for the 2px gap
-    # slowly increase offset as x and y increase. linearly increase offset over time as it gets closer to 15
-    ox = 23 * x / 15
-    oy = 23 * y / 15
-    square_x = x * (square_size + ox)
-    square_y = y * (square_size + oy)
+    center_x = (2 * square_size + square_size // 2)
+    center_y = (2 * square_size + square_size // 2)
+    square_x = (center_x + 2 * 2.3)
+    square_y = (center_y + 2 * 2.3)
+    square_x *= x/1.45
+    square_y *= y/1.45
+    if x < 3: square_x /= 1.5
+    if y < 3: square_y /= 1.5
+    if x == 3: square_x /= 1.3
+    if y == 3: square_y /= 1.3
     # move the mouse to the square
     pyautogui.moveTo(square_x + x_offset, square_y + y_offset)
 
@@ -185,7 +188,9 @@ if __name__ == '__main__':
     if board_coords is None:
         print("Board not found!")
         exit(1)
-    move_mouse_to_square(7, 1, board_coords[0], board_coords[1]+10, board_coords[2]+10)
+    import time
+    move_mouse_to_square(13, 2, board_coords[0], board_coords[1]+10, board_coords[2]+10)
+    time.sleep(1)
     # board = cv2.imread("board.png")
     # predict_board("board.png", None)
     # for idx, tile in enumerate(tiles):

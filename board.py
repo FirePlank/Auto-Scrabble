@@ -295,7 +295,6 @@ class Board:
 
 
 if __name__ == '__main__':
-    pass
 
     # # initialize DAWG
     # dictionary = DAWG('words.txt')
@@ -314,4 +313,4 @@ if __name__ == '__main__':
     game = sc.Game()
     game.play((7, 7), 'ave', 'down')
     for word in game.find_best_moves('HHHHH_H'):
-        print(word.word, word.score)
+        print(word)

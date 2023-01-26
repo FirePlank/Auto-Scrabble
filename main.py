@@ -5,16 +5,49 @@ import detect
 import json
 from mitmproxy import http
 import pyautogui
-
-def move_mouse_to_square(x, y, board_x, board_y, square_size):
-    # calculate the x and y coordinates of the square on the screen, accounting for the 2px gap
-    square_x = board_x + x * square_size + 2 * x
-    square_y = board_y + y * square_size + 2 * y
-    # move the mouse to the square
-    pyautogui.moveTo(square_x, square_y)
+import numpy as np
+import asyncio
 
 # create a new board
 board = sc.Game()
+# define x and y offsets and square size
+x_offsets = None
+y_offsets = None
+square_sizes = None
+
+async def type(word, delay, position):
+    # get currently focused window
+    window = pyautogui.getActiveWindow()
+    # wait a bit
+    await asyncio.sleep(delay)
+    # if the word is down, double click, otherwise just click
+    if word.direction == 'down': pyautogui.doubleClick()
+    else: pyautogui.click()
+    # sleep for a bit
+    await asyncio.sleep(0.1)
+    # type the word
+    pyautogui.typewrite(word.word.lower(), 0.15)
+    # press enter
+    pyautogui.press('enter')
+    # change focus back to original window
+    window.activate()
+    # move mouse back to original position
+    pyautogui.moveTo(position[0], position[1])
+
+def move_mouse_to_square(x, y, square_size, x_offset, y_offset):
+    # calculate the x and y coordinates of the square on the screen, accounting for the 2px gap
+    center_x = (2 * square_size + square_size // 2)
+    center_y = (2 * square_size + square_size // 2)
+    square_x = (center_x + 2 * 2.3)
+    square_y = (center_y + 2 * 2.3)
+    square_x *= x/1.45
+    square_y *= y/1.45
+    if x < 3: square_x /= 1.5
+    if y < 3: square_y /= 1.5
+    if x == 3: square_x /= 1.3
+    if y == 3: square_y /= 1.3
+    # move the mouse to the square
+    pyautogui.moveTo(square_x + x_offset, square_y + y_offset)
 
 print("Starting proxy, ready to play!")
 
@@ -22,7 +55,8 @@ class MyProxy:
     def request(self, _: http.HTTPFlow):
         pass
 
-    def response(self, flow: http.HTTPFlow):
+    async def response(self, flow: http.HTTPFlow):
+        global x_offsets, y_offsets, square_sizes
         try:
             if 'cloudfront.net' in flow.response.headers.get('via') and 'application/json' in flow.response.headers.get('content-type'):
                 # get the json data
@@ -92,9 +126,43 @@ class MyProxy:
 
                         # take full monitor screenshot
                         screenshot = pyautogui.screenshot()
+                        screenshot = np.array(screenshot)
                         # get the board coordinates
-                        board_coords = detect.find_board_edges(screenshot)
-                        move_mouse_to_square(5, 3, board_coords[0], board_coords[1], board_coords[2])
+                        board_coords = None
+                        if x_offsets is None:
+                            board_coords = detect.find_board_edges(screenshot)
+                            x_offsets = board_coords[1]
+                            y_offsets = board_coords[2]
+                            square_sizes = board_coords[0]
+                        else:
+                            board_coords = (square_sizes, x_offsets, y_offsets)
+
+                        square = best_word.start_square
+                        start_square = best_word.start_square
+                        got = False
+                        word = ''
+                        for i in range(len(best_word.word)):
+                            # check if square is empty
+                            lett = board.board.get_letter(square[0], square[1])
+                            print(lett, best_word.word[i], square)
+                            if lett is None:
+                                if got == False:
+                                    start_square = square
+                                    got = True
+                                word += best_word.word[i]
+
+                            if best_word.direction == 'down':
+                                square = (square[0]+1, square[1])
+                            else:
+                                square = (square[0], square[1]+1)
+                        
+                        best_word.word = word
+
+                        # get current mouse position
+                        position = pyautogui.position()
+                        move_mouse_to_square(start_square[1]+1, start_square[0]+1, board_coords[0], board_coords[1]+10, board_coords[2]+10)
+                        # type word without blocking this function, return but still continue the rest of the code
+                        asyncio.create_task(type(best_word, 3, position))
                 except Exception as e:
                     print(e)
         except:
