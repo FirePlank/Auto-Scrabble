@@ -38,16 +38,12 @@ def move_mouse_to_square(x, y, square_size, x_offset, y_offset):
     # calculate the x and y coordinates of the square on the screen, accounting for the 2px gap
     center_x = (2 * square_size + square_size // 2)
     center_y = (2 * square_size + square_size // 2)
-    square_x = (center_x + 2 * 2.3)
-    square_y = (center_y + 2 * 2.3)
-    square_x *= x/1.45
-    square_y *= y/1.45
-    if x < 3: square_x /= 1.5
-    if y < 3: square_y /= 1.5
-    if x == 3: square_x /= 1.3
-    if y == 3: square_y /= 1.3
+    square_x = (center_x + 2 * 2.9)
+    square_y = (center_y + 2 * 2.7)
+    square_x *= x/1.4
+    square_y *= y/1.4
     # move the mouse to the square
-    pyautogui.moveTo(square_x + x_offset, square_y + y_offset)
+    pyautogui.moveTo(square_x + x_offset + 10, square_y + y_offset - 5)
 
 print("Starting proxy, ready to play!")
 
@@ -65,19 +61,37 @@ class MyProxy:
                 try:
                     # clear board
                     board.board.clear()
+
+                    # check if game is over
+                    if json_data['IsGameOver']:
+                        print("Game has ended!")
+                        return
+
+                    if json_data['IsActiveGame'] == False or len(json_data['Players']) <= 1: return
+
+                    is_multiplayer = True
+                    for player in json_data['Players']:
+                        if player['PlayerType'] == 1: is_multiplayer = False
+
                     for entry in json_data['Data'][0]['Actions']:
                         if "Tiles" in entry:
-                            # a very convoluted and inefficient way to get the blank tile letters because for some reason the Flags is very random for blank tiles
+                            # a very convoluted way to get the blank tile letters because for some reason the Flags is very random for blank tiles
                             blank_tiles = []
                             for i in entry['Tiles']:
                                 if i['Flags'] > 30: blank_tiles.append((i['BoardIndex'], '-'))
-                            for i in entry['WordsPlayed']:
-                                # get blank tile letters
-                                for idx, j in enumerate(i['Tiles']):
-                                    for idx, k in enumerate(blank_tiles):
-                                        if k[0] == j['BoardIndex']:
-                                            blank_tiles[idx] = (k[0], i['Word'][idx])
-                                            break
+                            
+                            try:
+                                for i in entry['WordsPlayed']:
+                                    # get blank tile letters
+                                    for idx, j in enumerate(i['Tiles']):
+                                        for ix, k in enumerate(blank_tiles):
+                                            if k[0] == j['BoardIndex']:
+                                                blank_tiles[ix] = (k[0], i['Word'][idx])
+                                                break
+                            except:
+                                # player must have swapped or skipped their turn
+                                continue
+
                             for tile in entry["Tiles"]:
                                 # convert int to letter
                                 letter = ''
@@ -113,58 +127,116 @@ class MyProxy:
 
                     # print racks
                     if other_rack:
-                        print("Your rack:", other_rack)
-                        print("Opponent rack:", rack)
-                        # get the best word for opponent because why not
-                        # best_word = board.find_best_moves(''.join(rack).upper())[0]
-                        # print("Best word for the opponent:", best_word)
-                    else:
-                        print("Your rack:", rack)
-                        # get the best word
-                        best_word = board.find_best_moves(''.join(rack).upper())[0]
-                        print("Best word:", best_word)
+                        if is_multiplayer:
+                            print("Your rack:", rack)
+                            print("Opponent rack:", other_rack)
+                            # get the best word
+                            best_word = board.find_best_moves(''.join(rack).upper())[0]
+                            print("Best word:", best_word)
 
-                        # take full monitor screenshot
-                        screenshot = pyautogui.screenshot()
-                        screenshot = np.array(screenshot)
-                        # get the board coordinates
-                        board_coords = None
-                        if x_offsets is None:
-                            board_coords = detect.find_board_edges(screenshot)
-                            x_offsets = board_coords[1]
-                            y_offsets = board_coords[2]
-                            square_sizes = board_coords[0]
-                        else:
-                            board_coords = (square_sizes, x_offsets, y_offsets)
+                            # check if board is empty
+                            if board.board.empty:
+                                print("Board is empty, please play the first move manually")
+                                return
 
-                        square = best_word.start_square
-                        start_square = best_word.start_square
-                        got = False
-                        word = ''
-                        for i in range(len(best_word.word)):
-                            # check if square is empty
-                            lett = board.board.get_letter(square[0], square[1])
-                            print(lett, best_word.word[i], square)
-                            if lett is None:
-                                if got == False:
-                                    start_square = square
-                                    got = True
-                                word += best_word.word[i]
-
-                            if best_word.direction == 'down':
-                                square = (square[0]+1, square[1])
+                            # take full monitor screenshot
+                            screenshot = pyautogui.screenshot()
+                            screenshot = np.array(screenshot)
+                            # get the board coordinates
+                            board_coords = None
+                            if x_offsets is None:
+                                board_coords = detect.find_board_edges(screenshot)
+                                x_offsets = board_coords[1]
+                                y_offsets = board_coords[2]
+                                square_sizes = board_coords[0]
                             else:
-                                square = (square[0], square[1]+1)
-                        
-                        best_word.word = word
+                                board_coords = (square_sizes, x_offsets, y_offsets)
 
-                        # get current mouse position
-                        position = pyautogui.position()
-                        move_mouse_to_square(start_square[1]+1, start_square[0]+1, board_coords[0], board_coords[1]+10, board_coords[2]+10)
-                        # type word without blocking this function, return but still continue the rest of the code
-                        asyncio.create_task(type(best_word, 3, position))
+                            square = best_word.start_square
+                            start_square = best_word.start_square
+                            got = False
+                            word = ''
+                            for i in range(len(best_word.word)):
+                                # check if square is empty
+                                lett = board.board.get_letter(square[0], square[1])
+                                # print(lett, best_word.word[i], square)
+                                if lett is None:
+                                    if got == False:
+                                        start_square = square
+                                        got = True
+                                    word += best_word.word[i]
+
+                                if best_word.direction == 'down':
+                                    square = (square[0]+1, square[1])
+                                else:
+                                    square = (square[0], square[1]+1)
+
+                            best_word.word = word
+
+                            # get current mouse position
+                            position = pyautogui.position()
+                            move_mouse_to_square(start_square[1], start_square[0]+1, board_coords[0], board_coords[1]+10, board_coords[2]+10)
+                            # type word without blocking this function, return but still continue the rest of the code
+                            asyncio.create_task(type(best_word, 3, position))
+                        else:
+                            print("Your rack:", other_rack)
+                            print("Opponent rack:", rack)
+                    else:
+                        if is_multiplayer: print("Opponent rack:", rack)
+                        else:
+                            print("Your rack:", rack)
+                            # get the best word
+                            best_word = board.find_best_moves(''.join(rack).upper())[0]
+                            print("Best word:", best_word)
+
+                            # check if board is empty
+                            if board.board.empty:
+                                print("Board is empty, please play the first move manually")
+                                return
+
+                            # take full monitor screenshot
+                            screenshot = pyautogui.screenshot()
+                            screenshot = np.array(screenshot)
+                            # get the board coordinates
+                            board_coords = None
+                            if x_offsets is None:
+                                board_coords = detect.find_board_edges(screenshot)
+                                x_offsets = board_coords[1]
+                                y_offsets = board_coords[2]
+                                square_sizes = board_coords[0]
+                            else:
+                                board_coords = (square_sizes, x_offsets, y_offsets)
+
+                            square = best_word.start_square
+                            start_square = best_word.start_square
+                            got = False
+                            word = ''
+                            for i in range(len(best_word.word)):
+                                # check if square is empty
+                                lett = board.board.get_letter(square[0], square[1])
+                                # print(lett, best_word.word[i], square)
+                                if lett is None:
+                                    if got == False:
+                                        start_square = square
+                                        got = True
+                                    word += best_word.word[i]
+
+                                if best_word.direction == 'down':
+                                    square = (square[0]+1, square[1])
+                                else:
+                                    square = (square[0], square[1]+1)
+
+                            best_word.word = word
+
+                            # get current mouse position
+                            position = pyautogui.position()
+                            move_mouse_to_square(start_square[1], start_square[0]+1, board_coords[0], board_coords[1]+10, board_coords[2]+10)
+                            # type word without blocking this function, return but still continue the rest of the code
+                            asyncio.create_task(type(best_word, 3, position))
+
                 except Exception as e:
-                    print(e)
+                    if str(e) != "'Data'" and str(e) != "'IsGameOver'":
+                        print(e)
         except:
             pass
 

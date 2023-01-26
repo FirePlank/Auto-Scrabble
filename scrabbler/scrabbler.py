@@ -455,6 +455,8 @@ class Board:
         """clear the board"""
         self._board = [Square() for _ in range(self.size * self.size)]
         special_squares = self.special_squares
+        self.empty = True
+
         for coordinate in special_squares['DL']:
             self.square(*coordinate).effect = SquareEffect.DL
         for coordinate in special_squares['DW']:
